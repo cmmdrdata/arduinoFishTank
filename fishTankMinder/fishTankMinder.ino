@@ -7,7 +7,7 @@
  can usually tell them by the 16-pin interface.
 
  This sketch schedules regular water changes and interfaces with 2 pumps and 2 sensors.
- One pump is inside a fresh (dechlorinated ) water reservoir.  The second pump is 
+ Pump one is a submersible pump inside a fresh (dechlorinated ) water reservoir.  The second pump is 
  a submerisble pump inside the fish tank that will be used to drain a portion of the water. 
  One sensor is located on the waste water tank and determines when the tank is full during 
  the drain step. 
@@ -45,39 +45,48 @@
 
 // include the library code:
 #include <LiquidCrystal.h>
+#include <EEPROM.h>
 
+// input keys
 #define UP 2 
 #define DOWN 0 
 #define LEFT 4 
 #define RIGHT 6 
 #define SELECT 5 
+
+// index into variables array
 #define DAY 1 
 #define CHG_DAY 0 
+#define MAX_DRAIN_SEC 2
+#define MAX_FILL_SEC 3
+
 #define MAX_DAY 30
 #define DAYINMILSECONDS 86400 
 
+// pin outs
 #define TANK_LEVEL_INPUT 6
 #define WASTE_LEVEL_INPUT 7
 #define FILL_PUMP 8
 #define DRAIN_PUMP 9
+
 #define FULL 1 
 #define LOW 0 
-#define MAX_DRAIN_SEC 2
-#define MAX_FILL_SEC 3
+
 #define ON LOW
 #define OFF HIGH
+#define MAX_VAR 4 
 
 // initialize the library by associating any needed LCD interface pin
 // with the arduino pin number it is connected to
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
-char menuOptions[][50] = {"set change day", "set day","max drain", "max fill"};
+char menuOptions[][50] = {"set change day", "set day", "max drain", "max fill"};
 char maxOption = 3; 
 char minOption = 0; 
 
-int variable[4] = {5, 0, 10, 10}; // default 10 days to change 
-char option=0;
+int variable[4] = {5, 1, 10, 10}; // default 10 days to change 
+char option=01;
 long lastRead = 0;
 long started;
 
@@ -129,7 +138,7 @@ void setup() {
   digitalWrite(FILL_PUMP, OFF);
   digitalWrite(DRAIN_PUMP, OFF); 
 
-
+  readSettings();
   createCustomChars();
   // Print a message to the LCD.
   started = millis();
@@ -184,7 +193,7 @@ void processInput() {
           Serial.println(input);
           lastRead = millis();
       }
-  } else if ( (millis() - lastRead) > 10000) { // default screen 
+  } else if ( (millis() - lastRead) > 7000) { // default screen 
     //  lcd.clear();
       sprintf(buff,"day %d              ", variable[DAY]);
       lcd.print(buff);
@@ -240,8 +249,53 @@ void processInput() {
       sprintf(bf, "%2d     ",variable[option]);
       lcd.print(bf);
       
-      
+  } else if (input == SELECT) { 
+      lcd.clear();
+      lcd.setCursor(0, 1);
+      char bf[10];
+      sprintf(bf, "Write settings");
+      lcd.print(bf);
+      for (int x=0; x < MAX_VAR; x++) {
+         if (x != DAY) { 
+            EEPROM.update(x, variable[x]);
+         }
+      }  
+      delay(500); 
+      for (int x=0; x < MAX_VAR; x++) {
+         if (x != DAY) { 
+            EEPROM.update(x, variable[x]);
+         }
+      }  
+       for (int x=0; x < MAX_VAR; x++) {
+            Serial.print(" x = ");
+            Serial.print(x);
+            Serial.print(" val = ");
+            Serial.println(EEPROM.read(x));
+       }
+       lcd.clear();
   }
+}
+
+void readSettings() {
+   char val;
+   for (int x=0; x < MAX_VAR; x++) {
+            Serial.print(" x = ");
+            Serial.print(x);
+            Serial.print(" val = ");
+            val = EEPROM.read(x);
+            if (val >= 0 and val < 30) {
+                 variable[x] = val;
+
+            } else { 
+              Serial.print(" x = ");
+              Serial.print(x);
+              Serial.print(" val = ");
+              Serial.print(val);
+              Serial.print("  invalid!");
+            }
+       }
+       lcd.clear();
+       
 }
 
 void loop() {
