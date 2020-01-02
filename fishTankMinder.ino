@@ -1,15 +1,23 @@
 /*
-  LiquidCrystal Library - Hello World
+ Fish Tank Minder - aquarium control 
 
- Demonstrates the use a 16x2 LCD display.  The LiquidCrystal
+ project uses the 16x2 LCD display.  The LiquidCrystal
  library works with all LCD displays that are compatible with the
  Hitachi HD44780 driver. There are many of them out there, and you
  can usually tell them by the 16-pin interface.
 
- This sketch prints "Hello World!" to the LCD
- and shows the time.
+ This sketch schedules regular water changes and interfaces with 2 pumps and 2 sensors.
+ One pump is inside a fresh (dechlorinated ) water reservoir.  The second pump is 
+ a submerisble pump inside the fish tank that will be used to drain a portion of the water. 
+ One sensor is located on the waste water tank and determines when the tank is full during 
+ the drain step. 
+ The other sensor is located inside the fish tank and is used to detect when the desired
+ water level in the tank is reached during hte fill step.  
+ The scheduler keeps track of the # of days since the last change (1-30) and the 
+ desired change intervale (0-30).  A setting of 0 for "change days" turns off automatic
+ water changes but the # of days since last change will still be tracked.  
 
-  The circuit:
+  The display circuit:
  * LCD RS pin to digital pin 12
  * LCD Enable pin to digital pin 11
  * LCD D4 pin to digital pin 5
@@ -23,16 +31,11 @@
  * ends to +5V and ground
  * wiper to LCD VO pin (pin 3)
 
- Library originally added 18 Apr 2008
- by David A. Mellis
- library modified 5 Jul 2009
- by Limor Fried (http://www.ladyada.net)
- example added 9 Jul 2009
- by Tom Igoe
- modified 22 Nov 2010
- by Tom Igoe
- modified 7 Nov 2016
- by Arturo Guadalupi
+ * relay to fill pump (pin 7) 
+ * relay to drain pump (pin 8)
+ * sensor for aquarium water level (pin 6)  
+ * sensor for waste water level (pin 7)  
+ * keypad input (A0)
 
  This example code is in the public domain.
 
@@ -73,7 +76,7 @@ char menuOptions[][50] = {"set change day", "set day","max drain", "max fill"};
 char maxOption = 3; 
 char minOption = 0; 
 
-int variable[4] = {5, 1, 10, 10}; // default 10 days to change 
+int variable[4] = {5, 0, 10, 10}; // default 10 days to change 
 char option=0;
 long lastRead = 0;
 long started;
@@ -85,6 +88,8 @@ char error[50];
 bool isError = false;
 char buff[20];
 byte customChar[9];
+
+// characters to show tank filling or draining
 void createCustomChars () { 
   for (int y=9; y >0 ; y--) { 
       for (int x =1; x < 9; x++) { 
@@ -92,6 +97,7 @@ void createCustomChars () {
               customChar[x] = 0x00;
 
            } else if (y+1 > x ) { 
+              // surface motion
               customChar[x] = (0x66 >> y) & 0x1f;
 
            }else { 
@@ -124,7 +130,7 @@ void setup() {
   digitalWrite(DRAIN_PUMP, OFF); 
 
 
-createCustomChars();
+  createCustomChars();
   // Print a message to the LCD.
   started = millis();
 }
@@ -140,6 +146,7 @@ void readSensors() {
            wasteLev = level;
        }
        
+      
       Serial.print(" tankLev = ");
       Serial.print(tankLev);
       Serial.print(" wasteLev = ");
@@ -249,7 +256,6 @@ void loop() {
   // Check for time to change !
   if (variable[DAY] == variable[CHG_DAY]) {
       if (wasteLev == FULL) { 
-          //error = "EMPTY WASTE TANK!!"; 
           isError = true;
           
       }  else { 
